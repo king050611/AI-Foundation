@@ -350,3 +350,158 @@ $$ P(A \wedge B) = P(A) \times P(B) $$
 # 考点十四：房价预测问题
 
 ### 选择损失函数的形式（MSE、CE）
+- Choose MSE for the cost function
+- Reason
+  - House price prediction is a regression task, because we want a continuous value. And MSE is commonly used for regression tasks as it measures the average squared difference between predicted and actual values, effectively penalizing larger errors.---`房价预测是一个回归任务，因为我们想要一个连续的值。MSE通常用于回归任务，因为它测量预测值和实际值之间的平均平方差，有效地惩罚较大的误差。`
+  - The CE algorithm is mainly used for classifition tasks.
+
+### 定义目标函数
+
+设假设函数 (Hypothesis) 为线性模型：
+$$ h_w(x^{(i)}) = w_0 + w_1x^{(i)} $$
+
+则**目标函数 (Cost Function / Loss)** 定义为：
+$$ Loss(w_0, w_1) = \frac{1}{2m} \sum_{i=1}^{m} \left( h_w(x^{(i)}) - y^{(i)} \right)^2 $$
+
+*   其中 $m$ 是训练样本的数量。
+*   我们的目标是找到 $w_0, w_1$ 使得该函数最小化：
+    $$ \min_{w_0, w_1} Loss(w_0, w_1) $$
+
+
+#### 1. 公式的拆解理解
+
+$$ Loss(w_0, w_1) = \color{red}{\frac{1}{2m}} \sum_{i=1}^{m} \left( \color{blue}{h_w(x^{(i)}) - y^{(i)}} \right)^{\color{green}{2}} $$
+
+*   **蓝色部分 $\left( h_w(x^{(i)}) - y^{(i)} \right)$**：
+    *   这是 **误差 (Error)**。即模型预测的值 $h_w$ 减去 真实值 $y$。
+*   **绿色部分 $(\dots)^2$**：
+    *   这是 **平方 (Squared)**。
+    *   作用1：消除正负号的影响（预测多了或少了都算误差）。
+    *   作用2：**放大大的误差**。如果预测偏离很远，平方后惩罚会非常大，迫使模型尽快修正。
+*   **$\sum$ (求和)**：
+    *   把所有 $m$ 个样本的误差加起来。
+*   **$\frac{1}{m}$**：
+    *   这是 **均值 (Mean)**。除以样本数量，保证损失函数的大小不会因为样本数量增多而变得巨大，让不同规模的数据集可以比较。
+
+所以，核心部分就是：**Mean (均值) Squared (平方) Error (误差)**。
+
+
+#### 2. 为什么前面是 $\frac{1}{2m}$ 而不是 $\frac{1}{m}$？
+
+*“平均值不是应该除以 $m$ 吗？为什么这里除以 $2m$？”*
+
+这是一个**数学上的便利技巧**，是为了方便**第3步（计算梯度）**。
+
+当你对这个损失函数求导数（计算梯度）时，根据**求导的链式法则**，指数上的 **2** 会落下来：
+
+$$ \frac{d}{dx} (x^2) = 2x $$
+
+如果我们原本的系数是 $\frac{1}{2m}$，那么求导时：
+
+$$ 2 \times \frac{1}{2m} = \frac{1}{m} $$
+
+**这个 $\frac{1}{2}$ 正好把求导产生的 2 抵消掉了**。这样你的梯度更新公式（课件 Slide 13）就会变得非常整洁，没有多余的常数系数：
+
+$$ \text{梯度} = \frac{1}{m} \sum (h(x) - y) \cdot x $$
+
+**总结：**
+*   在**统计学**评估指标中，MSE 就是除以 $m$。
+*   在**机器学习优化（梯度下降）**中，为了计算方便，我们定义损失函数 $J(w)$ 或 $Loss$ 时通常除以 $2m$。
+*   **这不会影响结果**：因为 $\min \frac{1}{m} (\dots)$ 和 $\min \frac{1}{2m} (\dots)$ 得到的最小值点（即最优的 $w_0, w_1$）是完全同一个位置。
+
+### 计算梯度并给出参数更新的算式
+#### 1. 设定场景与初始值
+
+假设我们有 $m=2$ 个训练样本（为了计算方便，数据很简单）：
+
+*   **样本 1**: 房子面积 $x^{(1)} = 1$, 真实价格 $y^{(1)} = 2$
+*   **样本 2**: 房子面积 $x^{(2)} = 2$, 真实价格 $y^{(2)} = 4$
+    *   *(肉眼可见，完美的规律是 $y = 2x$，即 $w_0=0, w_1=2$)*
+
+我们初始化参数（故意设一个不准的值，看算法怎么修正它）：
+*   $w_0 = 0$ (偏置项)
+*   $w_1 = 1$ (权重项，斜率)
+*   **学习率 $\alpha = 0.1$**
+
+
+#### 第一阶段：计算梯度 (Calculate Gradients)
+
+我们要计算两个偏导数（梯度）：
+1.  针对 $w_0$ 的梯度：$\frac{\partial}{\partial w_0} Loss$
+2.  针对 $w_1$ 的梯度：$\frac{\partial}{\partial w_1} Loss$
+
+##### 步骤 1：计算预测值 (Prediction) $h_w(x)$
+公式：$h_w(x) = w_0 + w_1x$
+
+*   **样本 1**: $h(x^{(1)}) = 0 + 1 \times 1 = \mathbf{1}$
+*   **样本 2**: $h(x^{(2)}) = 0 + 1 \times 2 = \mathbf{2}$
+
+##### 步骤 2：计算误差项 (Error)
+公式：$Error = h_w(x^{(i)}) - y^{(i)}$
+
+*   **样本 1**: $1 - 2 = \mathbf{-1}$ (预测少了)
+*   **样本 2**: $2 - 4 = \mathbf{-2}$ (预测少了)
+
+##### 步骤 3：代入梯度公式
+
+**A. 计算 $w_0$ 的梯度**
+公式：$\frac{1}{m} \sum (h_w(x^{(i)}) - y^{(i)})$
+即：**(误差之和) / 样本数**
+
+$$
+\begin{aligned}
+\frac{\partial Loss}{\partial w_0} &= \frac{1}{2} \left[ \underbrace{(-1)}_{\text{样本1误差}} + \underbrace{(-2)}_{\text{样本2误差}} \right] \\
+&= \frac{1}{2} [-3] \\
+&= \mathbf{-1.5}
+\end{aligned}
+$$
+
+**B. 计算 $w_1$ 的梯度**
+公式：$\frac{1}{m} \sum (h_w(x^{(i)}) - y^{(i)}) \cdot x^{(i)}$
+即：**(误差 $\times$ 对应的x 输入) 的平均值**
+
+$$
+\begin{aligned}
+\frac{\partial Loss}{\partial w_1} &= \frac{1}{2} \left[ \underbrace{(-1) \cdot 1}_{\text{样本1: 误差}\times x} + \underbrace{(-2) \cdot 2}_{\text{样本2: 误差}\times x} \right] \\
+&= \frac{1}{2} [-1 + (-4)] \\
+&= \frac{1}{2} [-5] \\
+&= \mathbf{-2.5}
+\end{aligned}
+$$
+
+
+
+#### 第二阶段：参数更新 (Parameter Update)
+
+现在我们有了梯度，利用梯度下降公式来更新 $w_0$ 和 $w_1$。
+公式：$w_{new} = w_{old} - \alpha \times \text{gradient}$
+
+**A. 更新 $w_0$**
+$$
+\begin{aligned}
+w_0 &:= 0 - 0.1 \times (-1.5) \\
+w_0 &:= 0 + 0.15 \\
+w_0 &:= \mathbf{0.15}
+\end{aligned}
+$$
+
+**B. 更新 $w_1$**
+$$
+\begin{aligned}
+w_1 &:= 1 - 0.1 \times (-2.5) \\
+w_1 &:= 1 + 0.25 \\
+w_1 &:= \mathbf{1.25}
+\end{aligned}
+$$
+
+
+
+### 结果分析 (为什么要这样做？)
+
+经过这一轮更新后：
+*   **$w_1$ 从 1 变成了 1.25**。
+    *   因为真实斜率是 2，初始值 1 太小了。
+    *   梯度是负的 (-2.5)，说明我们在“下坡”。
+    *   减去负梯度等于加上正数，所以 $w_1$ **增大**了，向着正确答案 (2) 靠近了一步。
+
+---
